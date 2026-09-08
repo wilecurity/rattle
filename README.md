@@ -273,14 +273,6 @@ Distributed under the MIT License. See `LICENSE` for more information.
 
 ---
 
-## 📬 Contact
-
-- **Author**: [Your Name]
-- **GitHub**: [@yourusername](https://github.com/yourusername)
-- **Twitter**: [@yourhandle](https://twitter.com/yourhandle)
-
----
-
 <div align="center">
   <sub>Built with ❤️ for security research</sub>
 </div>
