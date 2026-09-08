@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Victims{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-users"></i> Victims
+                <span class="badge bg-primary float-end">{{ victims|length }} Total</span>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Email</th>
+                                <th>Campaign</th>
+                                <th>IP Address</th>
+                                <th>First Seen</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for victim in victims %}
+                            <tr>
+                                <td>{{ victim.id }}</td>
+                                <td>{{ victim.email or 'Unknown' }}</td>
+                                <td>{{ victim.campaign.name if victim.campaign else 'N/A' }}</td>
+                                <td>{{ victim.ip_address or 'N/A' }}</td>
+                                <td>{{ victim.first_seen.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td>
+                                    {% if victim.status == 'authorized' %}
+                                        <span class="badge bg-success">Authorized</span>
+                                    {% elif victim.status == 'pending' %}
+                                        <span class="badge bg-warning">Pending</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">{{ victim.status }}</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center text-muted">No victims yet</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
