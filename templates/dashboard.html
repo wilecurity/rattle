@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-md-3">
+        <div class="card text-white bg-primary mb-3">
+            <div class="card-body">
+                <h5 class="card-title">Total Campaigns</h5>
+                <h2>{{ total_campaigns }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-success mb-3">
+            <div class="card-body">
+                <h5 class="card-title">Active Campaigns</h5>
+                <h2>{{ active_campaigns }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-warning mb-3">
+            <div class="card-body">
+                <h5 class="card-title">Total Victims</h5>
+                <h2>{{ total_victims }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-danger mb-3">
+            <div class="card-body">
+                <h5 class="card-title">Tokens Captured</h5>
+                <h2>{{ total_tokens }}</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-chart-bar"></i> Victim Activity (Last 7 Days)
+            </div>
+            <div class="card-body">
+                <canvas id="victimChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-key"></i> Recent Tokens
+            </div>
+            <div class="card-body">
+                {% if recent_tokens %}
+                    <div class="list-group">
+                        {% for token in recent_tokens[:5] %}
+                            <div class="list-group-item list-group-item-action">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <small class="text-muted">
+                                        {% set user_info = token.user_info|json_loads if token.user_info else {} %}
+                                        {{ user_info.get('email', 'Unknown') }}
+                                    </small>
+                                    <small>{{ token.captured_at.strftime('%H:%M') }}</small>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted">No tokens captured yet</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-bolt"></i> Quick Actions
+            </div>
+            <div class="card-body">
+                <a href="{{ url_for('create_campaign') }}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Create Campaign
+                </a>
+                <a href="{{ url_for('campaigns') }}" class="btn btn-secondary">
+                    <i class="fas fa-list"></i> View All Campaigns
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const chartData = {
+        labels: [{% for item in victims_by_day %}'{{ item.date }}',{% endfor %}],
+        values: [{% for item in victims_by_day %}{{ item.count }},{% endfor %}]
+    };
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const ctx = document.getElementById('victimChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: chartData.labels.reverse(),
+                datasets: [{
+                    label: 'New Victims',
+                    data: chartData.values.reverse(),
+                    backgroundColor: 'rgba(52, 168, 83, 0.6)',
+                    borderColor: '#34a853',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+            }
+        });
+    });
+</script>
+{% endblock %}

