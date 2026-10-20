@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Email Campaigns{% endblock %}
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-paper-plane"></i> Email Campaigns
+                <a href="{{ url_for('email_campaign_create') }}" class="btn btn-sm btn-primary float-end">
+                    <i class="fas fa-plus"></i> New Email Campaign
+                </a>
+            </div>
+            <div class="card-body">
+                {% if campaigns %}
+                <table class="table">
+                    <thead><tr><th>Name</th><th>Status</th><th>Targets</th><th>Sent</th><th>Actions</th></tr></thead>
+                    <tbody>
+                        {% for c in campaigns %}
+                        <tr>
+                            <td>{{ c.name }}</td>
+                            <td><span class="badge bg-secondary">{{ c.status }}</span></td>
+                            <td>{{ c.total_targets }}</td>
+                            <td>{{ c.sent_count }}</td>
+                            <td>
+                                <a href="{{ url_for('email_campaign_detail', campaign_id=c.id) }}" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p class="text-muted">No email campaigns yet.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

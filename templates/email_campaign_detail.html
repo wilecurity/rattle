@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Email Campaign Details{% endblock %}
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-paper-plane"></i> {{ campaign.name }}
+                <button class="btn btn-sm btn-success float-end" onclick="startCampaign()">
+                    <i class="fas fa-rocket"></i> Start Sending
+                </button>
+            </div>
+            <div class="card-body">
+                <p><strong>Status:</strong> {{ campaign.status }}</p>
+                <p><strong>Targets:</strong> {{ campaign.total_targets }}</p>
+                <p><strong>Sent:</strong> {{ campaign.sent_count }}</p>
+                <p><strong>Failed:</strong> {{ campaign.failed_count }}</p>
+                <hr>
+                <h5>Targets</h5>
+                <table class="table table-sm">
+                    <thead><tr><th>Email</th><th>Status</th><th>Sent At</th></tr></thead>
+                    <tbody>
+                        {% for t in campaign.targets %}
+                        <tr>
+                            <td>{{ t.email }}</td>
+                            <td><span class="badge bg-{{ 'success' if t.status == 'sent' else 'warning' }}">{{ t.status }}</span></td>
+                            <td>{{ t.sent_at.strftime('%Y-%m-%d %H:%M') if t.sent_at else 'N/A' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+function startCampaign() {
+    if (!confirm('Start sending emails?')) return;
+    fetch(`/email-campaign/{{ campaign.id }}/send`, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                alert('✅ Campaign started!');
+                location.reload();
+            } else {
+                alert('❌ ' + data.error);
+            }
+        });
+}
+</script>
+{% endblock %}

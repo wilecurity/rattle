@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Add SMTP{% endblock %}
+{% block content %}
+<div class="row mt-4">
+    <div class="col-md-8 mx-auto">
+        <div class="card">
+            <div class="card-header"><i class="fas fa-envelope"></i> Add SMTP Configuration</div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Name</label>
+                        <input type="text" class="form-control" name="name" value="Default">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            <label class="form-label">SMTP Host *</label>
+                            <input type="text" class="form-control" name="host" placeholder="smtp.gmail.com" required>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Port *</label>
+                            <input type="number" class="form-control" name="port" value="587" required>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="use_tls" id="use_tls" checked>
+                                <label class="form-check-label" for="use_tls">Use TLS</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="use_ssl" id="use_ssl">
+                                <label class="form-check-label" for="use_ssl">Use SSL</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Username</label>
+                        <input type="text" class="form-control" name="username" placeholder="your-email@gmail.com">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Password</label>
+                        <input type="password" class="form-control" name="password" placeholder="App-specific password">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">From Email *</label>
+                            <input type="email" class="form-control" name="from_email" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">From Name</label>
+                            <input type="text" class="form-control" name="from_name" value="IT Support">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save SMTP</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

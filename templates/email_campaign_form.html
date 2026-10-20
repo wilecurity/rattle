@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Create Email Campaign{% endblock %}
+{% block content %}
+<div class="row mt-4">
+    <div class="col-md-8 mx-auto">
+        <div class="card">
+            <div class="card-header"><i class="fas fa-paper-plane"></i> Create Email Campaign</div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Campaign Name *</label>
+                        <input type="text" class="form-control" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Phishing Campaign *</label>
+                        <select class="form-select" name="campaign_id" required>
+                            <option value="">Select...</option>
+                            {% for c in campaigns %}
+                            <option value="{{ c.id }}">{{ c.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Email Template</label>
+                        <select class="form-select" name="template_id">
+                            <option value="">Select...</option>
+                            {% for t in templates %}
+                            <option value="{{ t.id }}">{{ t.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">SMTP Configuration</label>
+                        <select class="form-select" name="smtp_id">
+                            {% for s in smtps %}
+                            <option value="{{ s.id }}">{{ s.name }} ({{ s.from_email }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Targets (email,name per line)</label>
+                        <textarea class="form-control" name="targets" rows="5" placeholder="john@example.com,John Doe"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Create Campaign</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

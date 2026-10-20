@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}SMTP Settings{% endblock %}
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-envelope"></i> SMTP Configurations
+                <a href="{{ url_for('smtp_create') }}" class="btn btn-sm btn-primary float-end">
+                    <i class="fas fa-plus"></i> Add SMTP
+                </a>
+            </div>
+            <div class="card-body">
+                {% if configs %}
+                <table class="table">
+                    <thead><tr><th>Name</th><th>Host</th><th>From</th><th>Actions</th></tr></thead>
+                    <tbody>
+                        {% for config in configs %}
+                        <tr>
+                            <td>{{ config.name }}</td>
+                            <td>{{ config.host }}:{{ config.port }}</td>
+                            <td>{{ config.from_email }}</td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary" onclick="testSmtp({{ config.id }})">
+                                    <i class="fas fa-paper-plane"></i> Test
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="deleteSmtp({{ config.id }})">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p class="text-muted">No SMTP configurations yet.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+function testSmtp(id) {
+    fetch(`/smtp/${id}/test`, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => alert(data.success ? '✅ ' + data.message : '❌ ' + data.error));
+}
+function deleteSmtp(id) {
+    if (!confirm('Delete this SMTP configuration?')) return;
+    fetch(`/smtp/${id}/delete`, { method: 'POST' }).then(() => location.reload());
+}
+</script>
+{% endblock %}
