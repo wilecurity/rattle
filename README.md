@@ -2,19 +2,19 @@
   <h1>🐍 Rattle</h1>
   <p><strong>Google OAuth Consent Phishing Toolkit</strong></p>
   <p>
-    <img src="https://img.shields.io/badge/version-1.0.0-blue" alt="Version">
+    <img src="https://img.shields.io/badge/version-1.1.0-blue" alt="Version">
     <img src="https://img.shields.io/badge/python-3.8+-green" alt="Python">
     <img src="https://img.shields.io/badge/license-MIT-red" alt="License">
     <img src="https://img.shields.io/badge/platform-linux-lightgrey" alt="Platform">
   </p>
-  <p><i>Professional-grade OAuth consent phishing framework with a modern web interface</i></p>
+  <p><i>Professional-grade OAuth consent phishing framework with OAuth Viewer, Email Campaigns, and SMTP integration</i></p>
 </div>
 
 ---
 
 ## 📋 Overview
 
-**Rattle** is a complete, GUI-driven toolkit for Google OAuth consent phishing. It provides a professional dashboard to create campaigns, capture OAuth tokens, and manage victims—all through a clean web interface.
+**Rattle** is a complete, GUI-driven toolkit for Google OAuth consent phishing. It provides a professional dashboard to create campaigns, capture OAuth tokens, view token data via the **OAuth Viewer**, send phishing emails with **Email Campaigns**, and manage victims—all through a clean web interface.
 
 > ⚠️ **Disclaimer**: This tool is for educational and authorized security testing purposes only. Unauthorized use is illegal. The author assumes no responsibility for misuse.
 
@@ -22,6 +22,7 @@
 
 ## ✨ Features
 
+### Core Features
 | Feature | Description |
 |---------|-------------|
 | 🎯 **Campaign Management** | Create, manage, and track multiple phishing campaigns |
@@ -33,6 +34,18 @@
 | 📱 **QR Code Generation** | Generate QR codes for phishing links |
 | 🖥️ **Modern UI** | Clean, responsive Bootstrap-based interface |
 | 🔒 **SSL-Ready** | Built-in support for HTTPS/SSL via Nginx |
+
+### 🆕 New in v1.1
+
+| Feature | Description |
+|---------|-------------|
+| 👁️ **OAuth Viewer** | View captured tokens in a clean modal with copy functionality |
+| 📤 **Email Campaigns** | Send phishing emails to target lists automatically |
+| 📄 **Email Templates** | Create reusable HTML email templates with placeholders |
+| ⚙️ **SMTP Settings** | Configure and test SMTP servers directly in the panel |
+| 📬 **Background Sending** | Emails sent in background threads without blocking |
+| 🎯 **Target Tracking** | Track individual email targets (pending, sent, failed) |
+| 🔄 **Token Refresh via UI** | Refresh tokens directly from the tokens page |
 
 ---
 
@@ -74,11 +87,8 @@ pip install -r requirements.txt
 
 2. **Configure the app**:
    ```bash
-   # Copy example config
-   cp config.example.py config.py
-   
-   # Edit config.py with your credentials
-   nano config.py
+   # Edit app.py with your credentials
+   nano app.py
    ```
 
 3. **Run locally**:
@@ -118,7 +128,6 @@ sudo apt install -y nginx certbot python3-certbot-nginx
 
 # Configure Nginx
 sudo nano /etc/nginx/sites-available/rattle
-# (See setup_nginx_ssl.sh for config template)
 
 # Get SSL certificate
 sudo certbot --nginx -d yourdomain.com
@@ -126,9 +135,6 @@ sudo certbot --nginx -d yourdomain.com
 # Run with Gunicorn
 pip install gunicorn
 gunicorn -w 4 -b 127.0.0.1:8000 app:app
-
-# Or as a systemd service
-sudo nano /etc/systemd/system/rattle.service
 ```
 
 ---
@@ -149,6 +155,48 @@ sudo nano /etc/systemd/system/rattle.service
 2. Target authenticates via Google
 3. OAuth token is captured automatically
 4. View captured tokens in the **Tokens** section
+
+### 🆕 Using the OAuth Viewer
+
+The OAuth Viewer lets you inspect captured tokens:
+
+1. Go to **Tokens** page
+2. Click the **👁️ View** button on any token
+3. A modal opens showing:
+   - Access Token
+   - Refresh Token
+   - Email and Name
+   - Scopes
+   - Expiry Time
+4. Click **Copy** to copy the token data
+5. Click **Refresh** to get a new access token
+
+### 🆕 Sending Email Campaigns
+
+1. **Configure SMTP**:
+   - Go to **Email** > **SMTP Settings**
+   - Click **Add SMTP**
+   - Enter your SMTP details (host, port, username, password)
+   - Click **Test** to verify
+
+2. **Create a Template**:
+   - Go to **Email** > **Templates**
+   - Click **New Template**
+   - Enter name, subject, and HTML body
+   - Use placeholders: `{{name}}`, `{{email}}`, `{{link}}`
+
+3. **Create an Email Campaign**:
+   - Go to **Email** > **Email Campaigns**
+   - Click **New Email Campaign**
+   - Select your phishing campaign, template, and SMTP
+   - Paste target emails (one per line: `email,name`)
+   - Click **Create**
+
+4. **Send Emails**:
+   - Open the campaign
+   - Click **Start Sending**
+   - Emails are sent in the background
+   - Track progress in real-time
 
 ### Using Captured Tokens
 
@@ -184,9 +232,7 @@ The dashboard provides real-time insights:
 
 ```
 rattle/
-├── app.py                 # Main Flask application
-├── config.py              # Configuration file
-├── models.py              # Database models
+├── app.py                 # Main Flask application (ALL models & routes)
 ├── requirements.txt       # Python dependencies
 ├── setup_nginx_ssl.sh     # Nginx + SSL automation
 ├── static/
@@ -195,15 +241,22 @@ rattle/
 │   └── js/
 │       └── app.js         # Frontend JavaScript
 └── templates/
-    ├── base.html          # Base template
+    ├── base.html          # Base template with navigation
     ├── login.html         # Login page
     ├── dashboard.html     # Main dashboard
     ├── campaigns.html     # Campaign management
     ├── campaign_create.html
     ├── campaign_detail.html
     ├── victims.html       # Victim list
-    ├── tokens.html        # Token management
-    └── settings.html      # Settings page
+    ├── tokens.html        # Token management (with OAuth Viewer)
+    ├── settings.html      # Settings page
+    ├── smtp_list.html     # SMTP configurations
+    ├── smtp_form.html     # Add SMTP
+    ├── template_list.html # Email templates
+    ├── template_form.html # Create template
+    ├── email_campaigns.html    # Email campaigns list
+    ├── email_campaign_form.html # Create email campaign
+    └── email_campaign_detail.html # Email campaign details
 ```
 
 ---
